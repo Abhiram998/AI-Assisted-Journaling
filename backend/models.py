@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Text, DateTime
 import datetime
-from .database import Base
+from database import Base
 from pydantic import BaseModel
 
 class DBJournalEntry(Base):
