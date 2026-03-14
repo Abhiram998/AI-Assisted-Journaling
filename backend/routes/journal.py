@@ -9,10 +9,13 @@ from database import get_db
 from models import DBJournalEntry, JournalEntryCreate
 
 import os
-import requests
+from huggingface_hub import InferenceClient
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_MODEL_URL = "https://router.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base"
+HF_MODEL_ID = "j-hartmann/emotion-english-distilroberta-base"
+
+# Initialize client
+client = InferenceClient(token=HF_TOKEN)
 
 router = APIRouter(prefix="/api/journal", tags=["Journal"])
 
@@ -45,47 +48,24 @@ def analyze_journal(request: AnalyzeRequest):
     # Truncate text to avoid model length errors
     truncated_text = text[:512]
     
-    import time
-    
     try:
         if HF_TOKEN:
-            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-            payload = {"inputs": truncated_text, "options": {"wait_for_model": True}}
+            # InferenceClient handles URL routing automatically
+            results = client.text_classification(text=truncated_text, model=HF_MODEL_ID)
+            print(f"HF API Success: {results}")
             
-            # Simple retry logic for "Model Loading"
-            for attempt in range(3):
-                response = requests.post(HF_MODEL_URL, headers=headers, json=payload, timeout=25)
-                
-                if response.status_code == 200:
-                    results = response.json()
-                    print(f"HF API Success: {results}")
-                    
-                    if isinstance(results, list) and len(results) > 0:
-                        # Handle [[{}]] or [{}] formats
-                        inner = results[0]
-                        if isinstance(inner, list) and len(inner) > 0:
-                            hf_label = inner[0]["label"]
-                        else:
-                            hf_label = inner["label"]
-                        
-                        app_emotion = map_hf_emotion_to_app(hf_label)
-                        break # Success!
-                    else:
-                        app_emotion = "Calm"
-                        break
-                elif response.status_code == 503:
-                    # Model loading, wait and retry
-                    print(f"HF API Loading (Attempt {attempt+1})...")
-                    time.sleep(5)
-                else:
-                    print(f"HF API Error: {response.status_code} - {response.text}")
-                    app_emotion = "Calm"
-                    break
+            if results and isinstance(results, list):
+                # InferenceClient returns list of dicts like [{"label": "...", "score": ...}]
+                # Results are usually sorted by score descending
+                hf_label = results[0]["label"]
+                app_emotion = map_hf_emotion_to_app(hf_label)
+            else:
+                app_emotion = "Calm"
         else:
             print("HF_TOKEN not found in environment variables")
             app_emotion = "Calm"
     except Exception as e:
-        print(f"Error calling HF Inference API: {e}")
+        print(f"Error calling HF Inference API via Client: {e}")
         app_emotion = "Calm"
 
     # Simple keyword extraction (words > 5 chars for demo)
