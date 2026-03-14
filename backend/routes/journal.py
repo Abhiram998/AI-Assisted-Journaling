@@ -45,31 +45,44 @@ def analyze_journal(request: AnalyzeRequest):
     # Truncate text to avoid model length errors
     truncated_text = text[:512]
     
+    import time
+    
     try:
         if HF_TOKEN:
             headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-            payload = {"inputs": truncated_text}
+            payload = {"inputs": truncated_text, "options": {"wait_for_model": True}}
             
-            response = requests.post(HF_MODEL_URL, headers=headers, json=payload, timeout=20)
-            
-            if response.status_code == 200:
-                results = response.json()
-                # Check for list nested results
-                if isinstance(results, list) and len(results) > 0:
-                    # Some HF models return [[{"label": "...", "score": ...}]]
-                    inner = results[0]
-                    if isinstance(inner, list) and len(inner) > 0:
-                        hf_label = inner[0]["label"]
+            # Simple retry logic for "Model Loading"
+            for attempt in range(3):
+                response = requests.post(HF_MODEL_URL, headers=headers, json=payload, timeout=25)
+                
+                if response.status_code == 200:
+                    results = response.json()
+                    print(f"HF API Success: {results}")
+                    
+                    if isinstance(results, list) and len(results) > 0:
+                        # Handle [[{}]] or [{}] formats
+                        inner = results[0]
+                        if isinstance(inner, list) and len(inner) > 0:
+                            hf_label = inner[0]["label"]
+                        else:
+                            hf_label = inner["label"]
+                        
+                        app_emotion = map_hf_emotion_to_app(hf_label)
+                        break # Success!
                     else:
-                        hf_label = inner["label"]
-                    app_emotion = map_hf_emotion_to_app(hf_label)
+                        app_emotion = "Calm"
+                        break
+                elif response.status_code == 503:
+                    # Model loading, wait and retry
+                    print(f"HF API Loading (Attempt {attempt+1})...")
+                    time.sleep(5)
                 else:
+                    print(f"HF API Error: {response.status_code} - {response.text}")
                     app_emotion = "Calm"
-            else:
-                print(f"HF API Error: {response.status_code} - {response.text}")
-                app_emotion = "Calm"
+                    break
         else:
-            print("HF_TOKEN not found, skipping analysis")
+            print("HF_TOKEN not found in environment variables")
             app_emotion = "Calm"
     except Exception as e:
         print(f"Error calling HF Inference API: {e}")
