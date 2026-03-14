@@ -14,6 +14,8 @@ import requests
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_MODEL_URL = "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base"
 
+router = APIRouter(prefix="/api/journal", tags=["Journal"])
+
 class AnalyzeRequest(BaseModel):
     text: str
 
