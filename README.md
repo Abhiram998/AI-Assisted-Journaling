@@ -2,6 +2,13 @@
 
 A full-stack journaling platform that analyzes user emotions using a HuggingFace NLP model and provides mood insights over time.
 
+# Limitations
+
+• The current implementation uses a demo-user ID instead of authentication.
+
+• Unit tests are minimal for the assignment scope but the architecture supports
+test-driven development using FastAPI TestClient.
+
 ## Tech Stack
 
 Frontend
