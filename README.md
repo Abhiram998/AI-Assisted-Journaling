@@ -12,8 +12,8 @@ Frontend
 Backend
 - FastAPI
 - SQLAlchemy
-- SQLite
-- HuggingFace Transformers
+- PostgreSQL (Production) / SQLite (Local)
+- HuggingFace Hub (InferenceClient)
 
 ## Features
 
