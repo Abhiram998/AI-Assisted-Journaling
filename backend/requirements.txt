@@ -2,8 +2,7 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
-transformers
-torch
+requests
 python-dotenv
 gunicorn
 psycopg2-binary

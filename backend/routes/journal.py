@@ -8,15 +8,11 @@ import datetime
 from database import get_db
 from models import DBJournalEntry, JournalEntryCreate
 
-# HuggingFace pipeline for emotion detection
-from transformers import pipeline
+import os
+import requests
 
-router = APIRouter(prefix="/api/journal", tags=["Journal"])
-
-# Using a lightweight zero-shot classifier or generic sentiment classifier
-# Distilroberta emotion is well-suited for multiple emotional states
-# Note: May take a moment to download the first time
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=1)
+HF_TOKEN = os.getenv("HF_TOKEN")
+HF_MODEL_URL = "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base"
 
 class AnalyzeRequest(BaseModel):
     text: str
@@ -48,11 +44,33 @@ def analyze_journal(request: AnalyzeRequest):
     truncated_text = text[:512]
     
     try:
-        results = emotion_classifier(truncated_text)
-        hf_label = results[0][0]["label"]
-        app_emotion = map_hf_emotion_to_app(hf_label)
+        if HF_TOKEN:
+            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            payload = {"inputs": truncated_text}
+            
+            response = requests.post(HF_MODEL_URL, headers=headers, json=payload, timeout=20)
+            
+            if response.status_code == 200:
+                results = response.json()
+                # Check for list nested results
+                if isinstance(results, list) and len(results) > 0:
+                    # Some HF models return [[{"label": "...", "score": ...}]]
+                    inner = results[0]
+                    if isinstance(inner, list) and len(inner) > 0:
+                        hf_label = inner[0]["label"]
+                    else:
+                        hf_label = inner["label"]
+                    app_emotion = map_hf_emotion_to_app(hf_label)
+                else:
+                    app_emotion = "Calm"
+            else:
+                print(f"HF API Error: {response.status_code} - {response.text}")
+                app_emotion = "Calm"
+        else:
+            print("HF_TOKEN not found, skipping analysis")
+            app_emotion = "Calm"
     except Exception as e:
-        print(f"Error analyzing emotion: {e}")
+        print(f"Error calling HF Inference API: {e}")
         app_emotion = "Calm"
 
     # Simple keyword extraction (words > 5 chars for demo)
