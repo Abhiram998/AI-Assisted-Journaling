@@ -5,8 +5,8 @@ from typing import List, Any
 import uuid
 import datetime
 
-from ..database import get_db
-from ..models import DBJournalEntry, JournalEntryCreate
+from database import get_db
+from models import DBJournalEntry, JournalEntryCreate
 
 # HuggingFace pipeline for emotion detection
 from transformers import pipeline
